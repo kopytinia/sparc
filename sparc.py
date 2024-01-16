@@ -48,6 +48,20 @@ class Sparc:
             estimated_beta = np.divide(estimated_beta, divisor) * (self._n * self._P / self._L)**0.5
             t_squared = (z**2).sum()/self._n
         return self._decode_beta(estimated_beta)
+    
+    def BER(self, input_message: np.ndarray, output_message: np.ndarray) -> np.ndarray:
+        assert len(input_message) == len(output_message), f"Messages must have equal lengths"
+        
+        return (input_message != output_message).sum() / len(input_message)
+
+    def FER(self, input_message: np.ndarray, output_message: np.ndarray) -> np.ndarray:
+        assert len(input_message) == len(output_message), f"Messages must have equal lengths"
+        
+        frames = np.zeros(self._L)
+        log2m = int(np.round(np.log2(self._M)))
+        for i in range(self._L):
+            frames[i] = (input_message[log2m * i: log2m * (i + 1)] != output_message[log2m * i: log2m * (i + 1)]).any()
+        return frames.sum() / self._L
 
     def _construct_beta(self, input: np.ndarray) -> np.ndarray:
         beta = np.zeros(self._M * self._L)
@@ -73,7 +87,7 @@ class Sparc:
                     outp[log2m * (i + 1) - j - 1] = decimal % 2
                     decimal = decimal >> 1
             return outp
-
+    
 
 def _is_power_of_two(x):
     return (x != 0) and (x & (x-1) == 0)
