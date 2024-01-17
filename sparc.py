@@ -57,11 +57,7 @@ class Sparc:
     def FER(self, input_message: np.ndarray, output_message: np.ndarray) -> np.ndarray:
         assert len(input_message) == len(output_message), f"Messages must have equal lengths"
         
-        frames = np.zeros(self._L)
-        log2m = int(np.round(np.log2(self._M)))
-        for i in range(self._L):
-            frames[i] = (input_message[log2m * i: log2m * (i + 1)] != output_message[log2m * i: log2m * (i + 1)]).any()
-        return frames.sum() / self._L
+        return int((input_message != output_message).any())
 
     def _construct_beta(self, input: np.ndarray) -> np.ndarray:
         beta = np.zeros(self._M * self._L)
