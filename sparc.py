@@ -22,68 +22,70 @@ class Sparc:
 
         self._A = np.random.normal(0, 1 / n**0.5, size=[n, M * L])
         self._c = np.array([(n * P / L)**0.5] * L)
-    
-    def code(self, input: np.ndarray) -> np.ndarray:
-        assert len(input) == int(np.round(np.log2(self._M))) * self._L, f"For now only inputs of size L * log M are acceptable"
 
-        beta = self._construct_beta(input)
+    def code(self, codeword: np.ndarray) -> np.ndarray:
+        assert len(codeword) == int(np.round(np.log2(self._M))) * self._L, f"For now only inputs of size L * log M are acceptable"
+
+        beta = self._construct_beta(codeword)
         return self._A @ beta
 
-    def decode(self, input: np.ndarray, iterat: int = 50) -> np.ndarray:
-        assert len(input) == self._n, f"size of input must be equal {self._n}"
-        
+    def decode(self, codeword: np.ndarray, iterat: int = 50) -> np.ndarray:
+        assert len(codeword) == self._n, f"size of input must be equal {self._n}"
+
         estimated_beta = np.zeros(self._M * self._L) #predication of beta value before the channel
         z = np.zeros(self._n) # residual of decoding
         s = np.zeros(self._M * self._L) # test statistics
         divisor = np.zeros(self._M * self._L) # normalizing probability coefficient by segment
         t_squared = 1 # residual variance
-        
+
         # iterative decoding
-        for i in range(iterat):
-            z = input - self._A @ estimated_beta + z / t_squared * (self._P - (estimated_beta**2).sum()/self._n)
+        for _ in range(iterat):
+            z = codeword - self._A @ estimated_beta + z / t_squared * (self._P - (estimated_beta**2).sum()/self._n)
             s = np.transpose(self._A) @ z + estimated_beta
             estimated_beta = np.exp(s * (self._n * self._P / self._L) ** 0.5 / t_squared)
             for l in range(self._L):
                 divisor[self._M * l : self._M * (l + 1)] = (estimated_beta[self._M * l : self._M * (l + 1)]).sum()
             estimated_beta = np.divide(estimated_beta, divisor) * (self._n * self._P / self._L)**0.5
-            t_squared = (z**2).sum()/self._n
+            t_squared = (z**2).sum() / self._n
         return self._decode_beta(estimated_beta)
     
-    def _construct_beta(self, input: np.ndarray) -> np.ndarray:
+    def _construct_beta(self, codeword: np.ndarray) -> np.ndarray:
         beta = np.zeros(self._M * self._L)
         log2m = int(np.round(np.log2(self._M)))
 
         for i in range(self._L):
             # converting log M number of bits into decimal
             decimal = 0
-            for bit in input[i * log2m : (i + 1) * log2m]:
+            for bit in codeword[i * log2m : (i + 1) * log2m]:
                 decimal = (decimal << 1) | bit
 
             beta[i * self._M + decimal] = self._c[i]
 
         return beta
     
-    def _decode_beta(self, input: np.ndarray) -> np.ndarray:
+    def _decode_beta(self, codeword: np.ndarray) -> np.ndarray:
             log2m = int(np.round(np.log2(self._M)))
             outp = np.zeros(log2m * self._L)
             for i in range(self._L):
                 # converting decimal into log M number of bits
-                decimal = np.argmax(input[self._M * i: self._M * (i + 1)])
+                decimal = np.argmax(codeword[self._M * i : self._M * (i + 1)])
                 for j in range(log2m):
                     outp[log2m * (i + 1) - j - 1] = decimal % 2
                     decimal = decimal >> 1
             return outp
-    
+
 
 def _is_power_of_two(x):
-    return (x != 0) and (x & (x-1) == 0)
+    return (x != 0) and (x & (x - 1) == 0)
 
-def ber(input_message: np.ndarray, output_message: np.ndarray) -> np.ndarray:
+
+def ber(input_message: np.ndarray, output_message: np.ndarray) -> int:
     assert input_message.shape == output_message.shape, f"Messages must have equal lengths"
-        
+
     return (input_message != output_message).mean()
 
-def fer(input_message: np.ndarray, output_message: np.ndarray) -> np.ndarray:
+
+def fer(input_message: np.ndarray, output_message: np.ndarray) -> int:
     assert input_message.shape == output_message.shape, f"Messages must have equal lengths"
-        
+
     return int((input_message != output_message).any())
