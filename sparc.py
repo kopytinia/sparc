@@ -23,31 +23,47 @@ class Sparc:
         self._A = np.random.normal(0, 1 / n**0.5, size=[n, M * L])
         self._c = np.array([(n * P / L)**0.5] * L)
 
-    def code(self, codeword: np.ndarray) -> np.ndarray:
-        assert len(codeword) == int(np.round(np.log2(self._M))) * self._L, f"For now only inputs of size L * log M are acceptable"
+    def code(self, codewords: np.ndarray) -> np.ndarray:
+        if codewords.ndim == 1:  # if input is vector
+            codewords = codewords.reshape(1, -1)
+        elif codewords.ndim > 2:
+            assert False, f"input can be either vector or matrix"
+        assert codewords.shape[1] == int(np.round(np.log2(self._M))) * self._L, f"Second dim of input must be equal L * log M"  # странная подпись ошибки
 
-        beta = self._construct_beta(codeword)
-        return self._A @ beta
+        betas = np.zeros((codewords.shape[0], self._L * self._M))
+        for i in range(codewords.shape[0]):  # slow
+            betas[i] = self._construct_beta(codewords[i])
 
-    def decode(self, codeword: np.ndarray, iterat: int = 50) -> np.ndarray:
-        assert len(codeword) == self._n, f"size of input must be equal {self._n}"
+        return betas @ self._A.T 
 
-        estimated_beta = np.zeros(self._M * self._L) #predication of beta value before the channel
-        z = np.zeros(self._n) # residual of decoding
-        s = np.zeros(self._M * self._L) # test statistics
-        divisor = np.zeros(self._M * self._L) # normalizing probability coefficient by segment
-        t_squared = 1 # residual variance
+    def decode(self, codewords: np.ndarray, iterat: int = 50) -> np.ndarray:
+        if codewords.ndim == 1:  # if input is vector
+            codewords = codewords.reshape(1, -1)
+        elif codewords.ndim > 2:
+            assert False, f"input can be either vector or matrix"
+        assert codewords.shape[1] == self._n, f"size of input must be equal {self._n}" # тоже сомнительное сообщение
+
+        batch_size = codewords.shape[0]
+        estimated_beta = np.zeros((batch_size, self._M * self._L)) #predication of beta value before the channel
+        z = np.zeros((batch_size, self._n)) # residual of decoding
+        s = np.zeros((batch_size, self._M * self._L)) # test statistics
+        divisor = np.zeros((batch_size, self._M * self._L)) # normalizing probability coefficient by segment
+        t_squared = np.ones((batch_size, 1)) # residual variance
 
         # iterative decoding
         for _ in range(iterat):
-            z = codeword - self._A @ estimated_beta + z / t_squared * (self._P - (estimated_beta**2).sum()/self._n)
-            s = np.transpose(self._A) @ z + estimated_beta
+            z = codewords - estimated_beta @ self._A.T + z / t_squared * (self._P - (estimated_beta**2).sum(axis=1, keepdims=True) / self._n) 
+            s = z @ self._A + estimated_beta
             estimated_beta = np.exp(s * (self._n * self._P / self._L) ** 0.5 / t_squared)
             for l in range(self._L):
-                divisor[self._M * l : self._M * (l + 1)] = (estimated_beta[self._M * l : self._M * (l + 1)]).sum()
+                divisor[:, self._M * l : self._M * (l + 1)] = (estimated_beta[:, self._M * l : self._M * (l + 1)]).sum(axis=1, keepdims=True)  # be careful when bs == l * M
             estimated_beta = np.divide(estimated_beta, divisor) * (self._n * self._P / self._L)**0.5
-            t_squared = (z**2).sum() / self._n
-        return self._decode_beta(estimated_beta)
+            t_squared = (z**2).sum(axis=1, keepdims=True) / self._n
+
+        decoded_codewords = np.zeros((batch_size, self._L * int(np.round(np.log2(self._M)))))
+        for i in range(batch_size):  # slow
+            decoded_codewords[i] = self._decode_beta(estimated_beta[i])
+        return decoded_codewords
     
     def _construct_beta(self, codeword: np.ndarray) -> np.ndarray:
         beta = np.zeros(self._M * self._L)
