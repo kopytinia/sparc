@@ -34,14 +34,14 @@ class Sparc:
         for i in range(codewords.shape[0]):  # slow
             betas[i] = self._construct_beta(codewords[i])
 
-        return betas @ self._A.T 
+        return betas @ self._A.T  # [batch_size, n]
 
     def decode(self, codewords: np.ndarray, iterat: int = 50) -> np.ndarray:
         if codewords.ndim == 1:  # if input is vector
             codewords = codewords.reshape(1, -1)
         elif codewords.ndim > 2:
             assert False, f"input can be either vector or matrix"
-        assert codewords.shape[1] == self._n, f"size of input must be equal {self._n}" # тоже сомнительное сообщение
+        assert codewords.shape[1] == self._n, f"size of input must be equal {self._n}" # Странная подпись ошибки
 
         batch_size = codewords.shape[0]
         estimated_beta = np.zeros((batch_size, self._M * self._L)) #predication of beta value before the channel
@@ -56,14 +56,15 @@ class Sparc:
             s = z @ self._A + estimated_beta
             estimated_beta = np.exp(s * (self._n * self._P / self._L) ** 0.5 / t_squared)
             for l in range(self._L):
-                divisor[:, self._M * l : self._M * (l + 1)] = (estimated_beta[:, self._M * l : self._M * (l + 1)]).sum(axis=1, keepdims=True)  # be careful when bs == l * M
+                divisor[:, self._M * l : self._M * (l + 1)] = (estimated_beta[:, self._M * l : self._M * (l + 1)]).sum(axis=1, keepdims=True)
             estimated_beta = np.divide(estimated_beta, divisor) * (self._n * self._P / self._L)**0.5
             t_squared = (z**2).sum(axis=1, keepdims=True) / self._n
 
         decoded_codewords = np.zeros((batch_size, self._L * int(np.round(np.log2(self._M)))))
         for i in range(batch_size):  # slow
             decoded_codewords[i] = self._decode_beta(estimated_beta[i])
-        return decoded_codewords
+
+        return decoded_codewords  # [batch_size, L * log M]
     
     def _construct_beta(self, codeword: np.ndarray) -> np.ndarray:
         beta = np.zeros(self._M * self._L)
@@ -98,10 +99,10 @@ def _is_power_of_two(x):
 def ber(input_message: np.ndarray, output_message: np.ndarray) -> int:
     assert input_message.shape == output_message.shape, f"Messages must have equal lengths"
 
-    return (input_message != output_message).mean()
+    return (input_message != output_message).mean(axis=-1)
 
 
 def fer(input_message: np.ndarray, output_message: np.ndarray) -> int:
     assert input_message.shape == output_message.shape, f"Messages must have equal lengths"
 
-    return int((input_message != output_message).any())
+    return (input_message != output_message).any(axis=-1).astype(int)
