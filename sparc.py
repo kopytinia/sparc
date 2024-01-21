@@ -18,9 +18,11 @@ class Sparc:
         self._P = P
         self._seed = seed
 
-        np.random.seed(seed)
+        state = np.random.get_state()  # saving current random seed
+        np.random.seed(seed)  # setting a new one
+        self._A = np.random.normal(0, 1 / n**0.5, size=[n, M * L])  # doing random
+        np.random.set_state(state)  # returning old seed
 
-        self._A = np.random.normal(0, 1 / n**0.5, size=[n, M * L])
         self._c = np.array([(n * P / L)**0.5] * L)
 
     def code(self, codewords: np.ndarray) -> np.ndarray:
