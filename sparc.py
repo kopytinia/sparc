@@ -165,6 +165,30 @@ def fer(input_message: np.ndarray, output_message: np.ndarray) -> int:
 
     return (input_message != output_message).any(axis=-1).astype(int)
 
+def pec(input_message: np.ndarray, output_message: np.ndarray) -> int:
+    assert input_message.shape == output_message.shape, f"Messages must have equal lengths"
+    
+    statistics = {}
+    errors_array = input_message != output_message
+    k = 0
+    for i in errors_array:
+        if i:
+            k += 1
+        elif k > 0: 
+            if statistics.get(k):
+                statistics[k] += 1
+                k = 0
+            else: 
+                statistics[k] = 1
+                k = 0
+    if k > 0: 
+            if statistics.get(k):
+                statistics[k] += 1
+                k = 0
+            else: 
+                statistics[k] = 1
+                k = 0  
+    return statistics
 
 def groupby(groupby_column, groupby_function, *other_columns):
     unique_vals = np.unique(groupby_column)
